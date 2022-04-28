@@ -65,7 +65,7 @@ class KnownValues(unittest.TestCase):
 
     def test_dispersion_formula_known_values(self):
         """dispersion_formula should return function."""
-        for i, (formula, cs, wl, result) in enumerate(self.known_values):
+        for formula, cs, wl, result in self.known_values:
             catalog = pd.DataFrame(
                 {
                     "formula": [formula],
@@ -83,9 +83,7 @@ class KnownValues(unittest.TestCase):
 
     def test_dispersion_formula_for_tabulated(self):
         """dispersion_formula should return function."""
-        for i, (formula, wlnk, wl, result) in enumerate(
-            self.known_values_for_tabulated
-        ):
+        for formula, wlnk, wl, result in self.known_values_for_tabulated:
             wlnk = np.array(wlnk)
             wls = wlnk[:, 0]
             ns = wlnk[:, 1]

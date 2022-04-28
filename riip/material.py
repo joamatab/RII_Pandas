@@ -56,12 +56,12 @@ class Material:
     def bound_check(self, x: FloatNdarray, nk: str):
         if not self.bound_check_flag:
             return
-        if nk == "n":
-            wl_min = self.catalog["wl_n_min"]
-            wl_max = self.catalog["wl_n_max"]
-        elif nk == "k":
+        if nk == "k":
             wl_min = self.catalog["wl_k_min"]
             wl_max = self.catalog["wl_k_max"]
+        elif nk == "n":
+            wl_min = self.catalog["wl_n_min"]
+            wl_max = self.catalog["wl_n_max"]
         elif nk == "nk":
             wl_min = self.catalog["wl_min"]
             wl_max = self.catalog["wl_max"]
@@ -73,9 +73,7 @@ class Material:
         else:
             x_min = x_max = x
         if x_min < wl_min * 0.999 or x_max > wl_max * 1.001:
-            raise ValueError(
-                "Wavelength is out of bounds [{} {}][um]".format(wl_min, wl_max)
-            )
+            raise ValueError(f"Wavelength is out of bounds [{wl_min} {wl_max}][um]")
 
     def n(self, x: FloatNdarray) -> FloatNdarray:
         """Return n for given wavelength
@@ -171,26 +169,27 @@ class Material:
                     )(x)
             else:
                 raise Exception("Refractive indices are not provided.")
-            if "k" in tabulated:
-                num_k = self.catalog["num_k"]
-                wls_k = self.exp_data["wl_k"].values[:num_k]
-                ks = self.exp_data["k"].values[:num_k]
-                if len(ks) == 1:
-                    k = ks * np.ones_like(x)
-                else:
-                    k = interp1d(
-                        wls_k,
-                        ks,
-                        kind="linear",
-                        bounds_error=False,
-                        fill_value=(ks[0], ks[-1]),
-                        assume_sorted=True,
-                    )(x)
-            else:
+            if "k" not in tabulated:
                 raise Exception(
                     "Extinction coefficients are not provided.\n"
                     + "Please check if they are negligible."
                 )
+            num_k = self.catalog["num_k"]
+            wls_k = self.exp_data["wl_k"].values[:num_k]
+            ks = self.exp_data["k"].values[:num_k]
+            k = (
+                ks * np.ones_like(x)
+                if len(ks) == 1
+                else interp1d(
+                    wls_k,
+                    ks,
+                    kind="linear",
+                    bounds_error=False,
+                    fill_value=(ks[0], ks[-1]),
+                    assume_sorted=True,
+                )(x)
+            )
+
         return n, k
 
     def eps(self, x: FloatNdarray) -> ComplexNdarray:
@@ -203,11 +202,10 @@ class Material:
         formula = int(self.catalog["formula"])
         if formula > 20:
             return self.formulas[formula](x)
-        else:
-            n, k = self.func_nk(x)
-            eps = np.zeros_like(x, dtype=complex)
-            eps.real = n ** 2 - k ** 2
-            eps.imag = 2 * n * k
+        n, k = self.func_nk(x)
+        eps = np.zeros_like(x, dtype=complex)
+        eps.real = n ** 2 - k ** 2
+        eps.imag = 2 * n * k
         return eps
 
     def plot(
@@ -229,22 +227,23 @@ class Material:
         kwargs.setdefault("alpha", 0.5)
         kwargs.setdefault("lw", 4)
         kwargs.setdefault("ms", 8)
-        if comp == "n":
-            ns = self.n(wls)
-            plt.plot(wls, ns, fmt, label="{}".format(self.catalog["page"]), **kwargs)
-            plt.ylabel(r"$n$")
-        elif comp == "k":
-            ks = self.k(wls)
-            plt.plot(wls, ks, fmt, label="{}".format(self.catalog["page"]), **kwargs)
-            plt.ylabel(r"$k$")
-        elif comp == "eps":
+        if comp == "eps":
             eps = self.eps(wls)
             (line,) = plt.plot(
-                wls, eps.real, fmt, label="{}".format(self.catalog["page"]), **kwargs
+                wls, eps.real, fmt, label=f'{self.catalog["page"]}', **kwargs
             )
+
             kwargs.setdefault("color", line.get_color())
             plt.plot(wls, eps.imag, fmt, **kwargs)
             plt.ylabel(r"$\varepsilon$")
+        elif comp == "k":
+            ks = self.k(wls)
+            plt.plot(wls, ks, fmt, label=f'{self.catalog["page"]}', **kwargs)
+            plt.ylabel(r"$k$")
+        elif comp == "n":
+            ns = self.n(wls)
+            plt.plot(wls, ns, fmt, label=f'{self.catalog["page"]}', **kwargs)
+            plt.ylabel(r"$n$")
         plt.xlim(min(wls), max(wls))
         plt.xlabel(r"$\lambda$ $[\mathrm{\mu m}]$")
         plt.legend(loc="best")
@@ -301,15 +300,14 @@ class Material:
     def formula_7(self, x: FloatNdarray) -> FloatNdarray:
         cs = self.exp_data["c"].values[:24]
         x_sqr = x ** 2
-        n = (
+        return (
             cs[0]
             + cs[1] / (x_sqr - 0.028)
             + cs[2] / (x_sqr - 0.028) ** 2
             + cs[3] * x_sqr
-            + cs[4] * x_sqr ** 2
-            + cs[5] * x_sqr ** 3
+            + cs[4] * x_sqr**2
+            + cs[5] * x_sqr**3
         )
-        return n
 
     def formula_8(self, x: FloatNdarray) -> FloatNdarray:
         cs = self.exp_data["c"].values[:24]

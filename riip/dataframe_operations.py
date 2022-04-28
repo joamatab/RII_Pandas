@@ -163,7 +163,7 @@ class RiiDataFrame:
                                 #  material such as gas, liquid or solid, so it
                                 #  is added to the book and book_name with
                                 #  parentheses.
-                                page_class = " ({})".format(p["DIVIDER"])
+                                page_class = f' ({p["DIVIDER"]})'
                             else:
                                 book = "".join([b["BOOK"], page_class])
                                 book_name = "".join([b["name"], page_class])
@@ -196,10 +196,9 @@ class RiiDataFrame:
         except Exception as e:
             message = (
                 "There seems to be some inconsistency in the library.yml "
-                + "around id={}, shelf={}, book={}, page={}.".format(
-                    idx, shelf, book, page
-                )
+                + f"around id={idx}, shelf={shelf}, book={book}, page={page}."
             )
+
             raise Exception(message) from e
 
     def create_catalog(self) -> DataFrame:
@@ -227,9 +226,7 @@ class RiiDataFrame:
         return df
 
     def load_raw_data(self) -> DataFrame:
-        # Load catalog and experimental data.
-        df = load_csv(self.raw_data_file, dtype=self._raw_data_columns)
-        return df
+        return load_csv(self.raw_data_file, dtype=self._raw_data_columns)
 
     def extract_raw_data(
         self, idx: int, catalog: DataFrame
@@ -309,13 +306,12 @@ class RiiDataFrame:
                     num_k = len(wls_k)
                 else:
                     raise Exception("DATA is broken.")
-            # For formulas
             elif data_type == "formula":
                 formula = data_set
                 wl_n_min, wl_n_max = [float(s) for s in data["range"].strip().split()]
                 cs = [float(s) for s in data["coefficients"].strip().split()]
             else:
-                raise Exception("DATA has unknown contents {}".format(data_type))
+                raise Exception(f"DATA has unknown contents {data_type}")
 
         if len(tabulated) > 2:
             raise Exception("Too many tabulated data set are provided")
@@ -359,13 +355,11 @@ class RiiDataFrame:
         catalog.loc[idx, "wl_max"] = wl_max
 
         df = DataFrame(
-            {
-                key: val
-                for key, val in zip(
-                    self._raw_data_columns.keys(), [idx, cs, wls_n, ns, wls_k, ks]
-                )
-            }
+            dict(
+                zip(self._raw_data_columns.keys(), [idx, cs, wls_n, ns, wls_k, ks])
+            )
         )
+
         # Arrange the columns according to the order of _raw_data_columns
         df = df.loc[:, self._raw_data_columns.keys()]
         set_columns_dtype(df, self._raw_data_columns)
@@ -378,7 +372,7 @@ class RiiDataFrame:
         logger.info("Creating raw data...")
         df = DataFrame(columns=self._raw_data_columns)
         for idx in catalog.index:
-            logger.debug("{}: {}".format(idx, catalog.loc[idx, "path"]))
+            logger.debug(f'{idx}: {catalog.loc[idx, "path"]}')
             df_idx, catalog = self.extract_raw_data(idx, catalog)
             df = df.append(df_idx, ignore_index=True)
         set_columns_dtype(df, self._raw_data_columns)
@@ -394,7 +388,7 @@ class RiiDataFrame:
             self.create_grid_data(self.catalog, self.raw_data)
             logger.warning("Done.")
         else:
-            logger.info("Grid data file found at {}".format(self.grid_data_file))
+            logger.info(f"Grid data file found at {self.grid_data_file}")
         return load_csv(self.grid_data_file, dtype=self._grid_data_columns)
 
     def create_grid_data(self, catalog: DataFrame, raw_data: DataFrame) -> None:
@@ -411,7 +405,7 @@ class RiiDataFrame:
             wls = np.linspace(wl_min, wl_max, 200)
             ns = material.n(wls)
             ks = material.k(wls)
-            data = {key: val for key, val in zip(columns, [idx, wls, ns, ks])}
+            data = dict(zip(columns, [idx, wls, ns, ks]))
             df = df.append(DataFrame(data).loc[:, columns], ignore_index=True)
         set_columns_dtype(df, self._grid_data_columns)
         df.to_csv(self.grid_data_file, index=False, encoding="utf-8")
@@ -421,12 +415,11 @@ class RiiDataFrame:
         if not os.path.isfile(os.path.join(self.db_path, "library.yml")):
             logger.warning("Cloning Repository.")
             git.Repo.clone_from(_ri_database_repo, self._ri_database, branch="master")
-            logger.warning("Done.")
         else:
             logger.warning("Pulling Repository...")
             repo = git.Repo(self._ri_database)
             repo.remotes.origin.pull()
-            logger.warning("Done.")
+        logger.warning("Done.")
         logger.warning("Updating catalog file...")
         catalog = self.add_my_db_to_catalog(self.create_catalog())
         logger.warning("Done.")
@@ -463,14 +456,13 @@ class RiiDataFrame:
         n_max = cond.get("n_max", np.inf)
         k_min = cond.get("k_min", 0.0)
         k_max = cond.get("k_max", np.inf)
-        id_list = gd[
+        return gd[
             (gd["wl"] >= wl_min)
             & (gd["wl"] <= wl_max)
             & (gd["n"] >= n_min)
             & (gd["n"] <= n_max)
             & ((gd["k"] != gd["k"]) | (gd["k"] >= k_min) & (gd["k"] <= k_max))
         ].index.unique()
-        return id_list
 
     def show(self, idx: Union[int, Sequence[int]]) -> DataFrame:
         """Show page(s) of the ID (list of IDs)."""
@@ -484,10 +476,8 @@ class RiiDataFrame:
 
 def load_csv(csv_file: str, dtype: Union[None, Dict] = None) -> DataFrame:
     """Convert csv file to a DataFrame."""
-    # logger.info("Loading {}".format(os.path.basename(csv_file)))
-    df = pd.read_csv(csv_file, dtype=dtype, index_col="id")
     # logger.info("Done.")
-    return df
+    return pd.read_csv(csv_file, dtype=dtype, index_col="id")
 
 
 def set_columns_dtype(df: DataFrame, columns: Dict):
